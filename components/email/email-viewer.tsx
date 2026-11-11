@@ -5333,8 +5333,11 @@ export function EmailViewer({
       {/* Email Content Area. Mountain View reads the conversation on one plain
           sheet, so the reply buttons under the message sit on the page colour
           rather than on a tinted strip. */}
-      <div data-reader-scroll="" className={cn("flex-1 overflow-auto overscroll-contain", mvViewer || mvMobileViewer ? "bg-background" : "bg-muted/30", isMobile && !mvMobileViewer && "pb-[calc(3.25rem+env(safe-area-inset-bottom)/2)] sm:pb-0")}>
-      <div className="min-h-full flex flex-col">
+      <div data-reader-scroll="" className={cn("flex-1 overflow-auto overscroll-contain desk:px-4", mvViewer || mvMobileViewer ? "bg-background" : "bg-muted/30 desk:bg-background", isMobile && !mvMobileViewer && "pb-[calc(3.25rem+env(safe-area-inset-bottom)/2)] sm:pb-0")}>
+      {/* Stellewart: on desktop the message reads as a Fastmail-style card,
+          centred on the pane at most 60rem wide; its sections take the card
+          colour, which is also the mail's dark canvas. */}
+      <div className="min-h-full flex flex-col desk:min-h-0 desk:w-full desk:max-w-[60rem] desk:mx-auto desk:my-4 desk:rounded-xl desk:border desk:border-border desk:bg-card desk:overflow-hidden desk:[&_.bg-background]:bg-card" data-stellewart-card="">
 
       {/* Above the messages of the open conversation. */}
       {mvOpenIndex >= 0 && (

@@ -6,6 +6,7 @@ import {
   DARK_PENDING_CLASS,
   emailColorScheme,
   ensureContrast,
+  formatColor,
   parseComputedColor,
   resolveColorSchemeMedia,
   type Rgba,
@@ -32,13 +33,20 @@ describe('darkenBackground', () => {
     expect(out.b).toBeGreaterThan(out.r);
   });
 
-  it('leaves vivid brand colours and dark fills as sent', () => {
+  it('dims bright brand colours in their own hue and leaves dark fills as sent (Stellewart)', () => {
     const red = c('rgb(227, 6, 19)');
     const green = c('rgb(115, 215, 0)');
     const navy = c('rgb(0, 32, 91)');
     expect(darkenBackground(red)).toBe(red);
-    expect(darkenBackground(green)).toBe(green);
+    const dimmed = darkenBackground(green);
+    expect(lightness(dimmed)).toBeLessThan(lightness(green) * 0.8);
+    expect(dimmed.g).toBeGreaterThan(dimmed.r);
+    expect(dimmed.g).toBeGreaterThan(dimmed.b);
     expect(darkenBackground(navy)).toBe(navy);
+  });
+
+  it('lands white exactly on the canvas (Stellewart)', () => {
+    expect(formatColor(darkenBackground(c('rgb(255, 255, 255)')))).toBe('rgb(27, 30, 32)');
   });
 
   it('keeps alpha', () => {
@@ -227,7 +235,9 @@ describe('applyEmailDarkMode with bgcolor', () => {
   ])('darkens a light bgcolor on %s and keeps its text readable', (_, mail) => {
     const doc = render(mail);
     const bg = rewrittenBg(doc.getElementById('x')!);
-    expect(lightness(bg)).toBeLessThan(40);
+    // Stellewart: white lands on the #1b1e20 canvas, near-white greys a step
+    // lighter so a mail's layers stay apart.
+    expect(lightness(bg)).toBeLessThan(50);
     const text = c(doc.defaultView!.getComputedStyle(doc.getElementById('p')!).color);
     expect(contrastRatio(text, bg)).toBeGreaterThan(4.5);
   });

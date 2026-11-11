@@ -126,32 +126,34 @@
 
 .dark {
   --color-border: rgba(128, 128, 128, 0.3);
-  --color-input: #262626;
+  /* Stellewart: Fastmail's dark greys (a faint blue tint). The mail canvas
+     (lib/email-dark-mode EMAIL_DARK_BACKGROUND) is the card colour. */
+  --color-input: #25292c;
   --color-ring: #d4d4d4;
-  --color-background: #0a0a0a;
+  --color-background: #121416;
   --color-foreground: #fafafa;
   --color-primary: var(--brand-dark-primary, #fafafa);
   --color-primary-foreground: var(--brand-dark-primary-foreground, #171717);
-  --color-secondary: #262626;
+  --color-secondary: #25292c;
   --color-secondary-foreground: #fafafa;
-  --color-muted: #262626;
+  --color-muted: #25292c;
   --color-muted-foreground: #adadad;
   --color-accent: var(--brand-dark-accent, #1e3a8a);
   --color-accent-foreground: var(--brand-dark-accent-foreground, #dbeafe);
   --color-destructive: #ef4444;
   --color-destructive-foreground: #0a0a0a;
-  --color-popover: #1c1c1c;
+  --color-popover: #1f2326;
   --color-popover-foreground: #fafafa;
 
   /* Sidebar */
-  --color-sidebar: #0a0a0a;
+  --color-sidebar: #121416;
   --color-sidebar-foreground: #fafafa;
-  --color-sidebar-border: #262626;
-  --color-sidebar-accent: #1a1a1a;
+  --color-sidebar-border: #2b2f33;
+  --color-sidebar-accent: #1f2326;
   --color-sidebar-accent-foreground: #fafafa;
 
   /* Card */
-  --color-card: #141414;
+  --color-card: #1b1e20;
   --color-card-foreground: #fafafa;
 
   /* Semantic status colors */
