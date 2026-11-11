@@ -1,0 +1,7 @@
+# Test files the Stellewart pipeline skips, one glob per line, each with why.
+# Only upstream tests that also fail on the plain Bulwark release belong here;
+# remove an entry once Bulwark fixes it.
+#
+# Fails on stock Bulwark 1.21.1 too ("asks for the first mail data before it
+# shows the app as signed in, in the same task").
+stores/__tests__/auth-store-login-first-data.test.ts

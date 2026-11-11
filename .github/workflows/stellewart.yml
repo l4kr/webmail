@@ -87,15 +87,23 @@ jobs:
           ref: ${{ needs.follow.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run typecheck
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-      - run: npx vitest run --reporter=dot
-        # Two upstream tests depend on the machine (a local telemetry collector,
-        # health diagnostics); everything else must pass.
+      - name: Tests
+        # Upstream tests that fail on the plain Bulwark release too are listed
+        # (with the reason) in .github/stellewart-skip-tests.txt.
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r line; do
+            case "$line" in ''|'#'*) continue ;; esac
+            args+=(--exclude "$line")
+          done < .github/stellewart-skip-tests.txt
+          npx vitest run --reporter=dot "${args[@]}"
 
   image:
     name: Publish image
