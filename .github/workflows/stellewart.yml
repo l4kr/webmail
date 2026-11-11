@@ -1,0 +1,135 @@
+name: "Stellewart: follow Bulwark releases, test, publish image"
+
+# The `stellewart` branch is a Bulwark release tag plus our commits. Daily,
+# this checks for a newer Bulwark release; if there is one, it replays our
+# commits onto it. Every run then tests the branch and publishes
+#   ghcr.io/<owner>/webmail:<bulwark version>-stellewart   (+ :stellewart)
+# which Stellewart's updater (genostainer) picks up like any other image.
+# A clash between our commits and upstream fails the run (GitHub emails the
+# owner) and leaves the branch and the published image as they were.
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: "Test and publish even if Bulwark has no new release"
+        type: boolean
+        default: true
+  push:
+    branches: [stellewart]
+    paths-ignore: ["**.md"]
+
+concurrency:
+  group: stellewart
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  follow:
+    name: Follow Bulwark releases
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.result.outputs.sha }}
+      base: ${{ steps.result.outputs.base }}
+      build: ${{ steps.result.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stellewart
+          fetch-depth: 0
+      - name: Replay our commits onto the latest Bulwark release
+        id: result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force_build }}
+        run: |
+          set -euo pipefail
+          git remote add upstream https://github.com/bulwarkmail/webmail.git
+          git fetch --quiet upstream --tags --force
+          # Our base: the newest plain release tag (x.y.z) the branch contains.
+          base=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' --exclude '*-*' HEAD)
+          latest=$(gh api repos/bulwarkmail/webmail/releases/latest --jq .tag_name)
+          echo "our base: $base, latest Bulwark release: $latest"
+          build=false
+          if [ "$EVENT" = push ] || [ "$FORCE" = true ]; then build=true; fi
+          if [ "$latest" != "$base" ] && [ "$(printf '%s\n%s\n' "$base" "$latest" | sort -V | tail -1)" = "$latest" ]; then
+            git config user.name "l4kr"
+            git config user.email "73653844+l4kr@users.noreply.github.com"
+            echo "Replaying $(git rev-list --count "$base"..HEAD) commits onto $latest"
+            if ! git rebase --onto "$latest" "$base" HEAD; then
+              git rebase --abort || true
+              echo "::error::Our commits clash with Bulwark $latest. Stellewart keeps the last good image; resolve by hand."
+              exit 1
+            fi
+            git push --force-with-lease=stellewart origin HEAD:stellewart
+            base=$latest
+            build=true
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Typecheck and tests
+    needs: follow
+    if: needs.follow.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.follow.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - run: npx vitest run --reporter=dot
+        # Two upstream tests depend on the machine (a local telemetry collector,
+        # health diagnostics); everything else must pass.
+
+  image:
+    name: Publish image
+    needs: [follow, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.follow.outputs.sha }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Image name
+        id: name
+        run: echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr A-Z a-z)/webmail" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            GIT_COMMIT=${{ needs.follow.outputs.sha }}
+          tags: |
+            ${{ steps.name.outputs.image }}:${{ needs.follow.outputs.base }}-stellewart
+            ${{ steps.name.outputs.image }}:stellewart
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ needs.follow.outputs.sha }}
+            org.opencontainers.image.version=${{ needs.follow.outputs.base }}-stellewart
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
