@@ -206,6 +206,13 @@ function buildCreateBody(input: AppCredentialInput): Record<string, unknown> {
 
 type SetMethod = 'x:AppPassword/set' | 'x:ApiKey/set';
 
+/** Permission names from Stalwart's "not authorized to grant permissions: a, b" refusal. */
+export function ungrantablePermissions(description: string | undefined): string[] {
+  const m = description?.match(/not authorized to grant permissions?:\s*(.+)$/i);
+  if (!m) return [];
+  return m[1].split(',').map((p) => p.trim()).filter((p) => /^[A-Za-z][A-Za-z0-9]*$/.test(p));
+}
+
 type StoreGet = () => AccountSecurityState;
 type StoreSet = (partial: Partial<AccountSecurityState>) => void;
 
@@ -221,13 +228,26 @@ async function createCredential(
   try {
     const { accountId, request } = getManagementContext();
     const tmpId = 'new';
-    const responses = await request([
-      [method, { accountId, create: { [tmpId]: buildCreateBody(input) } }, '0'],
-    ]);
-    const result = requireResult<{
+    type CreateResult = {
       created?: Record<string, { id: string; secret: string; createdAt?: string }>;
       notCreated?: Record<string, { type: string; description?: string }>;
-    }>(responses, method);
+    };
+    const send = async (body: Record<string, unknown>) => requireResult<CreateResult>(
+      await request([[method, { accountId, create: { [tmpId]: body } }, '0']]), method);
+
+    let result = await send(buildCreateBody(input));
+    // Stellewart: a new credential inherits the account's permissions, but the
+    // session creating it may hold fewer (a webmail login is scoped to mail,
+    // contacts, ...). Stalwart then refuses: "You are not authorized to grant
+    // permissions: interactAi, sysArchivedItemQuery, ...". Retry once without
+    // exactly those: everything the account has that this session may grant.
+    const refused = ungrantablePermissions(result.notCreated?.[tmpId]?.description);
+    if (refused.length > 0) {
+      result = await send({
+        ...buildCreateBody(input),
+        permissions: { '@type': 'Disable', permissions: Object.fromEntries(refused.map((p) => [p, true])) },
+      });
+    }
 
     const notCreated = result.notCreated?.[tmpId];
     if (notCreated) {

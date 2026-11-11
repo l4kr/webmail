@@ -442,6 +442,39 @@ describe('account-security-store', () => {
       ).rejects.toThrow('description too short');
     });
 
+    it('retries without the permissions the session may not grant (Stellewart)', async () => {
+      mockedJmap
+        .mockResolvedValueOnce([
+          ['x:AppPassword/set', { notCreated: { new: { type: 'forbidden', description: 'You are not authorized to grant permissions: interactAi, sysArchivedItemQuery, sysArchivedItemGet' } } }, '0'],
+        ])
+        .mockResolvedValueOnce([
+          ['x:AppPassword/set', { created: { new: { id: 'p2', secret: 'S2' } } }, '0'],
+        ])
+        .mockResolvedValueOnce([
+          ['x:AccountPassword/get', { list: [{ otpAuth: {} }] }, '0'],
+          ['x:AppPassword/query', { ids: [] }, '1'],
+          ['x:ApiKey/query', { ids: [] }, '2'],
+        ]);
+
+      const result = await useAccountSecurityStore.getState().createAppPassword({ description: 'Mail app', allowedIps: ['fddc::1'] });
+
+      expect(result).toEqual({ id: 'p2', secret: 'S2' });
+      expect(mockedJmap.mock.calls[0][0][0][1].create.new).toEqual({ description: 'Mail app', allowedIps: { 'fddc::1': true } });
+      expect(mockedJmap.mock.calls[1][0][0][1].create.new).toEqual({
+        description: 'Mail app',
+        allowedIps: { 'fddc::1': true },
+        permissions: { '@type': 'Disable', permissions: { interactAi: true, sysArchivedItemQuery: true, sysArchivedItemGet: true } },
+      });
+    });
+
+    it('does not retry other refusals', async () => {
+      mockedJmap.mockResolvedValueOnce([
+        ['x:AppPassword/set', { notCreated: { new: { type: 'invalidProperties', description: 'description too short' } } }, '0'],
+      ]);
+      await expect(useAccountSecurityStore.getState().createAppPassword({ description: 'x' })).rejects.toThrow('description too short');
+      expect(mockedJmap).toHaveBeenCalledTimes(1);
+    });
+
     it('throws when the server does not return a secret', async () => {
       mockedJmap.mockResolvedValueOnce([
         ['x:AppPassword/set', { created: { new: { id: 'p' } } }, '0'],
