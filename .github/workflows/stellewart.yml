@@ -3,7 +3,7 @@ name: "Stellewart: follow Bulwark releases, test, publish image"
 # The `stellewart` branch is a Bulwark release tag plus our commits. Daily,
 # this checks for a newer Bulwark release; if there is one, it replays our
 # commits onto it. Every run then tests the branch and publishes
-#   ghcr.io/<owner>/webmail:<bulwark version>-stellewart   (+ :stellewart)
+#   ghcr.io/<owner>/webmail:<bulwark version>-stellewart.<run>   (+ :stellewart)
 # which Stellewart's updater (genostainer) picks up like any other image.
 # A clash between our commits and upstream fails the run (GitHub emails the
 # owner) and leaves the branch and the published image as they were.
@@ -125,6 +125,12 @@ jobs:
       - name: Image name
         id: name
         run: echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr A-Z a-z)/webmail" >> "$GITHUB_OUTPUT"
+      - name: Build sequence
+        id: sequence
+        # Reserve room for reruns so rerunning a build never overwrites its tag.
+        run: |
+          test '${{ github.run_attempt }}' -lt 1000000
+          echo "build=$(( ${{ github.run_number }} * 1000000 + ${{ github.run_attempt }} ))" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -133,11 +139,11 @@ jobs:
           build-args: |
             GIT_COMMIT=${{ needs.follow.outputs.sha }}
           tags: |
-            ${{ steps.name.outputs.image }}:${{ needs.follow.outputs.base }}-stellewart
+            ${{ steps.name.outputs.image }}:${{ needs.follow.outputs.base }}-stellewart.${{ steps.sequence.outputs.build }}
             ${{ steps.name.outputs.image }}:stellewart
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ needs.follow.outputs.sha }}
-            org.opencontainers.image.version=${{ needs.follow.outputs.base }}-stellewart
+            org.opencontainers.image.version=${{ needs.follow.outputs.base }}-stellewart.${{ steps.sequence.outputs.build }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
