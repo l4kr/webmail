@@ -1,0 +1,32 @@
+export const ruleEditorText = {
+  if: "If",
+  all: "all",
+  any: "any",
+  ofConditions: "of these conditions apply",
+  matchType: "Which conditions must apply",
+  conditionNumber: (n: number) => `Condition ${n}`,
+  hasAttachment: "Has an attachment",
+  attachmentType: "Attachment of type",
+  sizeUnits: { "": "bytes", K: "KB", M: "MB" } as const,
+  valueTitle: "Separate several values with commas",
+  then: "Then",
+  continueRules: "Continue to apply other rules",
+  skipRule: "Skip this rule",
+  more: "More options",
+  matching: (count: number, more: boolean) =>
+    count === 0
+      ? more ? "No recent messages match" : "No messages match"
+      : `${count}${more ? "+" : ""} ${count === 1 && !more ? "message matches" : "messages match"}`,
+  checking: "Looking for matching mail…",
+  forwardKeepCopy: "Keep a copy",
+  tagsLabel: "Tags",
+  noTags: "No tags yet",
+  newRule: "New rule",
+  attachmentTypeInvalid: "Enter a file extension, such as pdf",
+  actionConflict: "Delete and Reject cannot be combined with Move, Copy or Keep, or with each other",
+  applyTo: "Apply to",
+  applyNew: "New mail only",
+  applyFolder: (folder: string, count: string | null) => `New mail and ${folder}${count === null ? "" : ` (${count})`}`,
+  applyAll: (count: string | null) => `New mail and all mail${count === null ? "" : ` (${count})`}`,
+  applying: (name: string) => `Applying “${name}”…`,
+};
