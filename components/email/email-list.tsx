@@ -81,6 +81,7 @@ import { PluginSearchResults } from "./plugin-search-results";
 import { commonTagScope } from "@/hooks/use-account-tags";
 import { FolderRetentionLine } from "./retention-notice";
 import { canExport, canPrint } from "@/lib/device-policy";
+import "@/lib/stellewart-mail-motion";
 
 interface EmailListProps {
   emails: Email[];
